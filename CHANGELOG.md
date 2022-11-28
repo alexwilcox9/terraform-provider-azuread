@@ -1,3 +1,16 @@
+## 2.31.0 (Unreleased)
+
+IMPROVEMENTS:
+
+* `azuread_application` - validation for `identifier_uris` to detect trailing slash with no path [GH-928]
+
+## 2.30.0 (October 28, 2022)
+
+FEATURES:
+
+* **New Resource:** `azuread_synchronization_job` ([#830](https://github.com/hashicorp/terraform-provider-azuread/issues/830))
+* **New Resource:** `azuread_synchronization_secret` ([#830](https://github.com/hashicorp/terraform-provider-azuread/issues/830))
+
 ## 2.29.0 (September 29, 2022)
 
 IMPROVEMENTS:
