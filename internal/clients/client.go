@@ -16,6 +16,7 @@ import (
 	conditionalaccess "github.com/hashicorp/terraform-provider-azuread/internal/services/conditionalaccess/client"
 	directoryroles "github.com/hashicorp/terraform-provider-azuread/internal/services/directoryroles/client"
 	domains "github.com/hashicorp/terraform-provider-azuread/internal/services/domains/client"
+	entitlementmanagement "github.com/hashicorp/terraform-provider-azuread/internal/services/entitlementmanagement/client"
 	groups "github.com/hashicorp/terraform-provider-azuread/internal/services/groups/client"
 	invitations "github.com/hashicorp/terraform-provider-azuread/internal/services/invitations/client"
 	policies "github.com/hashicorp/terraform-provider-azuread/internal/services/policies/client"
@@ -34,17 +35,18 @@ type Client struct {
 
 	StopContext context.Context
 
-	AdministrativeUnits *administrativeunits.Client
-	Applications        *applications.Client
-	AppRoleAssignments  *approleassignments.Client
-	ConditionalAccess   *conditionalaccess.Client
-	DirectoryRoles      *directoryroles.Client
-	Domains             *domains.Client
-	Groups              *groups.Client
-	Invitations         *invitations.Client
-	Policies            *policies.Client
-	ServicePrincipals   *serviceprincipals.Client
-	Users               *users.Client
+	AdministrativeUnits   *administrativeunits.Client
+	Applications          *applications.Client
+	AppRoleAssignments    *approleassignments.Client
+	ConditionalAccess     *conditionalaccess.Client
+	DirectoryRoles        *directoryroles.Client
+	EntitlementManagement *entitlementmanagement.Client
+	Domains               *domains.Client
+	Groups                *groups.Client
+	Invitations           *invitations.Client
+	Policies              *policies.Client
+	ServicePrincipals     *serviceprincipals.Client
+	Users                 *users.Client
 }
 
 func (client *Client) build(ctx context.Context, o *common.ClientOptions) error {
@@ -56,6 +58,7 @@ func (client *Client) build(ctx context.Context, o *common.ClientOptions) error 
 	client.Domains = domains.NewClient(o)
 	client.ConditionalAccess = conditionalaccess.NewClient(o)
 	client.DirectoryRoles = directoryroles.NewClient(o)
+	client.EntitlementManagement = entitlementmanagement.NewClient(o)
 	client.Groups = groups.NewClient(o)
 	client.Invitations = invitations.NewClient(o)
 	client.Policies = policies.NewClient(o)
