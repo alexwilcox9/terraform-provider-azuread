@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-provider-azuread/internal/services/applications"
 	"github.com/hashicorp/terraform-provider-azuread/internal/services/approleassignments"
 	"github.com/hashicorp/terraform-provider-azuread/internal/services/conditionalaccess"
+	"github.com/hashicorp/terraform-provider-azuread/internal/services/devicemanagement"
 	"github.com/hashicorp/terraform-provider-azuread/internal/services/directoryobjects"
 	"github.com/hashicorp/terraform-provider-azuread/internal/services/directoryroles"
 	"github.com/hashicorp/terraform-provider-azuread/internal/services/domains"
@@ -27,6 +28,7 @@ import (
 func SupportedTypedServices() []sdk.TypedServiceRegistration {
 	return []sdk.TypedServiceRegistration{
 		applications.Registration{},
+		devicemanagement.Registration{},
 		directoryroles.Registration{},
 		domains.Registration{},
 		policies.Registration{},
