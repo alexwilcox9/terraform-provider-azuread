@@ -23,6 +23,7 @@ import (
 	applications "github.com/hashicorp/terraform-provider-azuread/internal/services/applications/client"
 	approleassignments "github.com/hashicorp/terraform-provider-azuread/internal/services/approleassignments/client"
 	conditionalaccess "github.com/hashicorp/terraform-provider-azuread/internal/services/conditionalaccess/client"
+	devicemanagement "github.com/hashicorp/terraform-provider-azuread/internal/services/devicemanagement/client"
 	directoryobjects "github.com/hashicorp/terraform-provider-azuread/internal/services/directoryobjects/client"
 	directoryroles "github.com/hashicorp/terraform-provider-azuread/internal/services/directoryroles/client"
 	domains "github.com/hashicorp/terraform-provider-azuread/internal/services/domains/client"
@@ -52,6 +53,7 @@ type Client struct {
 	Applications        *applications.Client
 	AppRoleAssignments  *approleassignments.Client
 	ConditionalAccess   *conditionalaccess.Client
+	DeviceManagement    *devicemanagement.Client
 	DirectoryObjects    *directoryobjects.Client
 	DirectoryRoles      *directoryroles.Client
 	Domains             *domains.Client
@@ -81,6 +83,9 @@ func (client *Client) build(ctx context.Context, o *common.ClientOptions) error 
 	}
 	if client.ConditionalAccess, err = conditionalaccess.NewClient(o); err != nil {
 		return fmt.Errorf("building clients for ConditionalAccess: %v", err)
+	}
+	if client.DeviceManagement, err = devicemanagement.NewClient(o); err != nil {
+		return fmt.Errorf("building clients for DeviceManagement: %v", err)
 	}
 	if client.DirectoryObjects, err = directoryobjects.NewClient(o); err != nil {
 		return fmt.Errorf("building clients for DirectoryObjects: %v", err)

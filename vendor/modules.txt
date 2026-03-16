@@ -77,6 +77,7 @@ github.com/hashicorp/go-azure-sdk/microsoft-graph/applications/stable/owner
 github.com/hashicorp/go-azure-sdk/microsoft-graph/applicationtemplates/stable/applicationtemplate
 github.com/hashicorp/go-azure-sdk/microsoft-graph/common-types/beta
 github.com/hashicorp/go-azure-sdk/microsoft-graph/common-types/stable
+github.com/hashicorp/go-azure-sdk/microsoft-graph/devicemanagement/beta/configurationpolicy
 github.com/hashicorp/go-azure-sdk/microsoft-graph/directory/beta/administrativeunitmember
 github.com/hashicorp/go-azure-sdk/microsoft-graph/directory/stable/administrativeunit
 github.com/hashicorp/go-azure-sdk/microsoft-graph/directory/stable/administrativeunitmember
