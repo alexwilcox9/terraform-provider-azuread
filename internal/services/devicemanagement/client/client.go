@@ -5,6 +5,7 @@ package client
 
 import (
 	"github.com/hashicorp/go-azure-sdk/microsoft-graph/devicemanagement/beta/configurationpolicy"
+	"github.com/hashicorp/go-azure-sdk/microsoft-graph/devicemanagement/beta/configurationpolicysetting"
 	"github.com/hashicorp/terraform-provider-azuread/internal/common"
 )
 
@@ -17,7 +18,8 @@ import (
 // breaking a policy in this way, is to delete and recreate it, which is wholly undesirable for a critical security resource.
 
 type Client struct {
-	ConfigurationPolicyClient *configurationpolicy.ConfigurationPolicyClient
+	ConfigurationPolicyClient        *configurationpolicy.ConfigurationPolicyClient
+	ConfigurationPolicySettingClient *configurationpolicysetting.ConfigurationPolicySettingClient
 }
 
 func NewClient(o *common.ClientOptions) (*Client, error) {
@@ -26,8 +28,14 @@ func NewClient(o *common.ClientOptions) (*Client, error) {
 		return nil, err
 	}
 	o.Configure(configurationPolicyClient.Client)
+	configurationPolicySettingClient, err := configurationpolicysetting.NewConfigurationPolicySettingClientWithBaseURI(o.Environment.MicrosoftGraph)
+	if err != nil {
+		return nil, err
+	}
+	o.Configure(configurationPolicySettingClient.Client)
 
 	return &Client{
-		ConfigurationPolicyClient: configurationPolicyClient,
+		ConfigurationPolicyClient:        configurationPolicyClient,
+		ConfigurationPolicySettingClient: configurationPolicySettingClient,
 	}, nil
 }

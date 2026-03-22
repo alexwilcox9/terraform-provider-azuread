@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/go-azure-helpers/lang/response"
 	"github.com/hashicorp/go-azure-sdk/microsoft-graph/common-types/beta"
 	"github.com/hashicorp/go-azure-sdk/microsoft-graph/devicemanagement/beta/configurationpolicy"
+	"github.com/hashicorp/go-azure-sdk/microsoft-graph/devicemanagement/beta/configurationpolicysetting"
 	"github.com/hashicorp/go-azure-sdk/sdk/nullable"
 	"github.com/hashicorp/terraform-provider-azuread/internal/helpers/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azuread/internal/helpers/tf/validation"
@@ -22,6 +23,7 @@ var _ sdk.ResourceWithUpdate = DeviceManagementConfigurationPolicy{}
 
 func settingSchema(depth int) *pluginsdk.Resource {
 	result := map[string]*pluginsdk.Schema{
+		// Add read only ID here id depth == 0
 		"setting_definition_id": {
 			Type:     pluginsdk.TypeString,
 			Required: true,
@@ -133,11 +135,47 @@ type DeviceManagementConfigurationPolicySettings struct {
 }
 
 type DeviceManagementConfigurationChoiceSetting struct {
+	// Add ID here
 	SettingDefinitionId       string                                         `tfschema:"setting_definition_id"`
 	SettingInstanceTemplateId string                                         `tfschema:"setting_instance_template_id"`
 	Value                     string                                         `tfschema:"value"`
 	SettingValueTemplateId    string                                         `tfschema:"setting_value_template_id"`
 	Children                  []*DeviceManagementConfigurationPolicySettings `tfschema:"children"`
+}
+
+func expandSettings(in []interface{}) []*DeviceManagementConfigurationPolicySettings {
+	if len(in) == 0 || in[0] == nil {
+		return nil
+	}
+
+	result := make([]*DeviceManagementConfigurationPolicySettings, 0)
+
+	for _, setting := range in {
+		settingResult := DeviceManagementConfigurationPolicySettings{}
+		config := setting.(map[string]interface{})
+
+		settingResult.ChoiceSettings = expandChoiceSettings(config["choice_setting"].([]interface{}))
+
+		result = append(result, pointer.To(settingResult))
+	}
+
+	return result
+}
+
+func expandChoiceSettings(in []interface{}) []DeviceManagementConfigurationChoiceSetting {
+	result := make([]DeviceManagementConfigurationChoiceSetting, 0)
+	for _, setting := range in {
+		config := setting.(map[string]interface{})
+		settingResult := DeviceManagementConfigurationChoiceSetting{
+			SettingDefinitionId:       config["setting_definition_id"].(string),
+			SettingInstanceTemplateId: config["setting_instance_template_id"].(string),
+			Value:                     config["value"].(string),
+			SettingValueTemplateId:    config["setting_value_template_id"].(string),
+			Children:                  expandSettings(config["children"].([]interface{})),
+		}
+		result = append(result, settingResult)
+	}
+	return result
 }
 
 func (r DeviceManagementConfigurationPolicy) Create() sdk.ResourceFunc {
@@ -150,6 +188,15 @@ func (r DeviceManagementConfigurationPolicy) Create() sdk.ResourceFunc {
 			if err := metadata.Decode(&model); err != nil {
 				return fmt.Errorf("decoding: %+v", err)
 			}
+			settings := make([]DeviceManagementConfigurationPolicySettings, 0)
+			for _, setting := range expandSettings(metadata.ResourceData.Get("settings").([]interface{})) {
+				settings = append(settings, *setting)
+			}
+
+			model.Settings = settings
+			metadata.Encode(&model)
+
+			// a := metadata.ResourceData.
 
 			// a := make([]beta.DeviceManagementConfigurationSetting, 0)
 
@@ -220,11 +267,14 @@ func (r DeviceManagementConfigurationPolicy) Read() sdk.ResourceFunc {
 		Timeout: 5 * time.Minute,
 		Func: func(ctx context.Context, metadata sdk.ResourceMetaData) error {
 			client := metadata.Client.DeviceManagement.ConfigurationPolicyClient
+			settingsClient := metadata.Client.DeviceManagement.ConfigurationPolicySettingClient
 
 			id, err := beta.ParseDeviceManagementConfigurationPolicyID(metadata.ResourceData.Id())
 			if err != nil {
 				return fmt.Errorf("unable to parse ID: %v", err)
 			}
+
+			settingsId := beta.NewDeviceManagementConfigurationPolicyIdSettingID(id.DeviceManagementConfigurationPolicyId, "") // Use new setting ID here
 
 			var model DeviceManagementConfigurationPolicyModel
 			if err := metadata.Decode(&model); err != nil {
@@ -239,20 +289,34 @@ func (r DeviceManagementConfigurationPolicy) Read() sdk.ResourceFunc {
 				return fmt.Errorf("retrieving %s: %+v", id, err)
 			}
 
-			response := resp.Model
+			responseModel := resp.Model
 
-			if response != nil {
-				model.Description = response.Description.GetOrZero()
-				model.Name = response.Name.GetOrZero()
-				if response.Platforms != nil {
-					model.Platforms = string(*response.Platforms)
+			if responseModel != nil {
+				model.Description = responseModel.Description.GetOrZero()
+				model.Name = responseModel.Name.GetOrZero()
+				if responseModel.Platforms != nil {
+					model.Platforms = string(*responseModel.Platforms)
 				}
-				if response.Technologies != nil {
-					model.Technologies = string(*response.Technologies)
+				if responseModel.Technologies != nil {
+					model.Technologies = string(*responseModel.Technologies)
 				}
-				if response.RoleScopeTagIds != nil {
-					model.RoleScopeTagIds = *response.RoleScopeTagIds
+				if responseModel.RoleScopeTagIds != nil {
+					model.RoleScopeTagIds = *responseModel.RoleScopeTagIds
 				}
+				// if response.Settings != nil {
+				// 	model.Settings = flattenDeviceManagementConfigurationPolicySettings(response.Settings)
+				// }
+				// if response.Settings == nil {
+				// 	return fmt.Errorf("%+v\n", response)
+				// }
+			}
+
+			settingsResp, err := settingsClient.GetConfigurationPolicySetting(ctx, settingsId, configurationpolicysetting.DefaultGetConfigurationPolicySettingOperationOptions())
+			if err != nil {
+				if response.WasNotFound(settingsResp.HttpResponse) {
+					return metadata.MarkAsGone(id)
+				}
+				return fmt.Errorf("retrieving %s: %+v", id, err)
 			}
 
 			return metadata.Encode(&model)
@@ -313,6 +377,68 @@ func (r DeviceManagementConfigurationPolicy) Delete() sdk.ResourceFunc {
 	}
 }
 
+func flattenDeviceManagementConfigurationPolicySettings(input *[]beta.DeviceManagementConfigurationSetting) []DeviceManagementConfigurationPolicySettings {
+	result := make([]DeviceManagementConfigurationPolicySettings, 0)
+	if input == nil {
+		return result
+	}
+
+	for _, setting := range *input {
+		settingResult := DeviceManagementConfigurationPolicySettings{}
+		// id = setting.Id
+		switch v := setting.SettingInstance.(type) {
+		case beta.DeviceManagementConfigurationChoiceSettingInstance:
+			choiceSetting := DeviceManagementConfigurationChoiceSetting{}
+			if v.SettingDefinitionId != nil {
+				choiceSetting.SettingDefinitionId = *v.SettingDefinitionId
+			}
+			if v.SettingInstanceTemplateReference != nil && v.SettingInstanceTemplateReference.SettingInstanceTemplateId != nil {
+				choiceSetting.SettingInstanceTemplateId = *v.SettingInstanceTemplateReference.SettingInstanceTemplateId
+			}
+			if v.ChoiceSettingValue != nil {
+				choiceSetting.Value = v.ChoiceSettingValue.Value.GetOrZero()
+				if v.ChoiceSettingValue.Children != nil {
+					choiceSetting.Children = flattenDeviceManagementConfigurationSettingInstance(v.ChoiceSettingValue.Children)
+				}
+			}
+			settingResult.ChoiceSettings = append(settingResult.ChoiceSettings, choiceSetting)
+		}
+
+		result = append(result, settingResult)
+	}
+	return result
+}
+
+func flattenDeviceManagementConfigurationSettingInstance(input *[]beta.DeviceManagementConfigurationSettingInstance) []*DeviceManagementConfigurationPolicySettings {
+	result := make([]*DeviceManagementConfigurationPolicySettings, 0)
+	if input == nil {
+		return result
+	}
+
+	for _, setting := range *input {
+		settingResult := DeviceManagementConfigurationPolicySettings{}
+		switch v := setting.(type) {
+		case beta.DeviceManagementConfigurationChoiceSettingInstance:
+			choiceSetting := DeviceManagementConfigurationChoiceSetting{}
+			if v.SettingDefinitionId != nil {
+				choiceSetting.SettingDefinitionId = *v.SettingDefinitionId
+			}
+			if v.SettingInstanceTemplateReference != nil && v.SettingInstanceTemplateReference.SettingInstanceTemplateId != nil {
+				choiceSetting.SettingInstanceTemplateId = *v.SettingInstanceTemplateReference.SettingInstanceTemplateId
+			}
+			if v.ChoiceSettingValue != nil {
+				choiceSetting.Value = v.ChoiceSettingValue.Value.GetOrZero()
+				if v.ChoiceSettingValue.Children != nil {
+					choiceSetting.Children = flattenDeviceManagementConfigurationSettingInstance(v.ChoiceSettingValue.Children)
+				}
+			}
+			settingResult.ChoiceSettings = append(settingResult.ChoiceSettings, choiceSetting)
+		}
+		result = append(result, &settingResult)
+	}
+	return result
+}
+
 func expandDeviceManagementConfigurationPolicySettings(input []DeviceManagementConfigurationPolicySettings) *[]beta.DeviceManagementConfigurationSetting {
 	result := make([]beta.DeviceManagementConfigurationSetting, 0)
 
@@ -333,7 +459,9 @@ func expandDeviceManagementConfigurationPolicySettings(input []DeviceManagementC
 			}
 			children := make([]DeviceManagementConfigurationPolicySettings, 0)
 			for _, child := range choiceSetting.Children {
-				children = append(children, pointer.From(child))
+				if child != nil {
+					children = append(children, pointer.From(child))
+				}
 			}
 			if len(children) > 0 {
 				choiceSettingresult.ChoiceSettingValue.Children = expandDeviceManagementConfigurationSettingInstance(children)
@@ -367,7 +495,9 @@ func expandDeviceManagementConfigurationSettingInstance(input []DeviceManagement
 			}
 			children := make([]DeviceManagementConfigurationPolicySettings, 0)
 			for _, child := range choiceSetting.Children {
-				children = append(children, pointer.From(child))
+				if child != nil {
+					children = append(children, pointer.From(child))
+				}
 			}
 			if len(children) > 0 {
 				choiceSettingresult.ChoiceSettingValue.Children = expandDeviceManagementConfigurationSettingInstance(children)
