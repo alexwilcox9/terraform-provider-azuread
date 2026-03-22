@@ -6,6 +6,7 @@ package devicemanagement
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/hashicorp/go-azure-helpers/lang/pointer"
@@ -23,7 +24,6 @@ var _ sdk.ResourceWithUpdate = DeviceManagementConfigurationPolicy{}
 
 func settingSchema(depth int) *pluginsdk.Resource {
 	result := map[string]*pluginsdk.Schema{
-		// Add read only ID here id depth == 0
 		"setting_definition_id": {
 			Type:     pluginsdk.TypeString,
 			Required: true,
@@ -40,6 +40,12 @@ func settingSchema(depth int) *pluginsdk.Resource {
 			Type:     pluginsdk.TypeString,
 			Optional: true,
 		},
+	}
+	if depth == 0 {
+		result["id"] = pointer.To(pluginsdk.Schema{
+			Type:     pluginsdk.TypeString,
+			Computed: true,
+		})
 	}
 
 	if depth < 10 {
@@ -111,6 +117,7 @@ func (r DeviceManagementConfigurationPolicy) Arguments() map[string]*pluginsdk.S
 		"settings": {
 			Type:     pluginsdk.TypeList,
 			Required: true,
+			MinItems: 1,
 			MaxItems: 1,
 			Elem:     settingSchema(0),
 		},
@@ -134,48 +141,25 @@ type DeviceManagementConfigurationPolicySettings struct {
 	ChoiceSettings []DeviceManagementConfigurationChoiceSetting `tfschema:"choice_setting"`
 }
 
+type DeviceManagementConfigurationPolicySettingsInstance struct {
+	ChoiceSettings []DeviceManagementConfigurationChoiceSettingInstance `tfschema:"choice_setting"`
+}
+
 type DeviceManagementConfigurationChoiceSetting struct {
-	// Add ID here
-	SettingDefinitionId       string                                         `tfschema:"setting_definition_id"`
-	SettingInstanceTemplateId string                                         `tfschema:"setting_instance_template_id"`
-	Value                     string                                         `tfschema:"value"`
-	SettingValueTemplateId    string                                         `tfschema:"setting_value_template_id"`
-	Children                  []*DeviceManagementConfigurationPolicySettings `tfschema:"children"`
+	Id                        string                                                 `tfschema:"id"`
+	SettingDefinitionId       string                                                 `tfschema:"setting_definition_id"`
+	SettingInstanceTemplateId string                                                 `tfschema:"setting_instance_template_id"`
+	Value                     string                                                 `tfschema:"value"`
+	SettingValueTemplateId    string                                                 `tfschema:"setting_value_template_id"`
+	Children                  []*DeviceManagementConfigurationPolicySettingsInstance `tfschema:"children"`
 }
 
-func expandSettings(in []interface{}) []*DeviceManagementConfigurationPolicySettings {
-	if len(in) == 0 || in[0] == nil {
-		return nil
-	}
-
-	result := make([]*DeviceManagementConfigurationPolicySettings, 0)
-
-	for _, setting := range in {
-		settingResult := DeviceManagementConfigurationPolicySettings{}
-		config := setting.(map[string]interface{})
-
-		settingResult.ChoiceSettings = expandChoiceSettings(config["choice_setting"].([]interface{}))
-
-		result = append(result, pointer.To(settingResult))
-	}
-
-	return result
-}
-
-func expandChoiceSettings(in []interface{}) []DeviceManagementConfigurationChoiceSetting {
-	result := make([]DeviceManagementConfigurationChoiceSetting, 0)
-	for _, setting := range in {
-		config := setting.(map[string]interface{})
-		settingResult := DeviceManagementConfigurationChoiceSetting{
-			SettingDefinitionId:       config["setting_definition_id"].(string),
-			SettingInstanceTemplateId: config["setting_instance_template_id"].(string),
-			Value:                     config["value"].(string),
-			SettingValueTemplateId:    config["setting_value_template_id"].(string),
-			Children:                  expandSettings(config["children"].([]interface{})),
-		}
-		result = append(result, settingResult)
-	}
-	return result
+type DeviceManagementConfigurationChoiceSettingInstance struct {
+	SettingDefinitionId       string                                                 `tfschema:"setting_definition_id"`
+	SettingInstanceTemplateId string                                                 `tfschema:"setting_instance_template_id"`
+	Value                     string                                                 `tfschema:"value"`
+	SettingValueTemplateId    string                                                 `tfschema:"setting_value_template_id"`
+	Children                  []*DeviceManagementConfigurationPolicySettingsInstance `tfschema:"children"`
 }
 
 func (r DeviceManagementConfigurationPolicy) Create() sdk.ResourceFunc {
@@ -194,42 +178,6 @@ func (r DeviceManagementConfigurationPolicy) Create() sdk.ResourceFunc {
 			}
 
 			model.Settings = settings
-			metadata.Encode(&model)
-
-			// a := metadata.ResourceData.
-
-			// a := make([]beta.DeviceManagementConfigurationSetting, 0)
-
-			// b := beta.DeviceManagementConfigurationChoiceSettingInstance{
-			// 	SettingDefinitionId: pointer.To("device_vendor_msft_policy_config_secguidev22h2~policy~cat_secguide_pol_secguide_a001_block_flash"),
-			// 	SettingInstanceTemplateReference: pointer.To(beta.DeviceManagementConfigurationSettingInstanceTemplateReference{
-			// 		SettingInstanceTemplateId: pointer.To("bf7fb31d-c639-489b-8226-94ac86cb7b03"),
-			// 	}),
-			// 	ChoiceSettingValue: pointer.To(beta.DeviceManagementConfigurationChoiceSettingValue{
-			// 		Value: nullable.Value("device_vendor_msft_policy_config_secguidev22h2~policy~cat_secguide_pol_secguide_a001_block_flash_1"),
-			// 		SettingValueTemplateReference: pointer.To(beta.DeviceManagementConfigurationSettingValueTemplateReference{
-			// 			SettingValueTemplateId: pointer.To("955247be-9bcd-470b-af8a-9c7fa1ea70d9"),
-			// 		}),
-			// 		Children: pointer.To([]beta.DeviceManagementConfigurationSettingInstance{
-			// 			beta.DeviceManagementConfigurationChoiceSettingInstance{
-			// 				SettingDefinitionId: pointer.To("device_vendor_msft_policy_config_secguidev22h2~policy~cat_secguide_pol_secguide_a001_block_flash_pol_secguide_block_flash"),
-			// 				SettingInstanceTemplateReference: pointer.To(beta.DeviceManagementConfigurationSettingInstanceTemplateReference{
-			// 					SettingInstanceTemplateId: pointer.To("adf0ffe0-1a26-4ad4-9016-016599eb0251"),
-			// 				}),
-			// 				ChoiceSettingValue: pointer.To(beta.DeviceManagementConfigurationChoiceSettingValue{
-			// 					SettingValueTemplateReference: pointer.To(beta.DeviceManagementConfigurationSettingValueTemplateReference{
-			// 						SettingValueTemplateId: pointer.To("a4c5edad-e134-43a9-95b3-7b629bb9c256"),
-			// 					}),
-			// 					Value: nullable.Value("device_vendor_msft_policy_config_secguidev22h2~policy~cat_secguide_pol_secguide_a001_block_flash_pol_secguide_block_flash_block embedded flash activation only"),
-			// 				}),
-			// 			},
-			// 		}),
-			// 	}),
-			// }
-
-			// a = append(a, beta.DeviceManagementConfigurationSetting{
-			// 	SettingInstance: b,
-			// })
 
 			properties := beta.DeviceManagementConfigurationPolicy{
 				Description:     nullable.Value(model.Description),
@@ -274,8 +222,6 @@ func (r DeviceManagementConfigurationPolicy) Read() sdk.ResourceFunc {
 				return fmt.Errorf("unable to parse ID: %v", err)
 			}
 
-			settingsId := beta.NewDeviceManagementConfigurationPolicyIdSettingID(id.DeviceManagementConfigurationPolicyId, "") // Use new setting ID here
-
 			var model DeviceManagementConfigurationPolicyModel
 			if err := metadata.Decode(&model); err != nil {
 				return fmt.Errorf("decoding: %+v", err)
@@ -303,23 +249,28 @@ func (r DeviceManagementConfigurationPolicy) Read() sdk.ResourceFunc {
 				if responseModel.RoleScopeTagIds != nil {
 					model.RoleScopeTagIds = *responseModel.RoleScopeTagIds
 				}
-				// if response.Settings != nil {
-				// 	model.Settings = flattenDeviceManagementConfigurationPolicySettings(response.Settings)
-				// }
-				// if response.Settings == nil {
-				// 	return fmt.Errorf("%+v\n", response)
-				// }
 			}
 
-			settingsResp, err := settingsClient.GetConfigurationPolicySetting(ctx, settingsId, configurationpolicysetting.DefaultGetConfigurationPolicySettingOperationOptions())
-			if err != nil {
-				if response.WasNotFound(settingsResp.HttpResponse) {
-					return metadata.MarkAsGone(id)
+			settingsModel := make([]*beta.DeviceManagementConfigurationSetting, 0)
+			for x := range *responseModel.SettingCount {
+				settingsId := beta.NewDeviceManagementConfigurationPolicyIdSettingID(id.DeviceManagementConfigurationPolicyId, strconv.FormatInt(x, 10))
+
+				settingsResp, err := settingsClient.GetConfigurationPolicySetting(ctx, settingsId, configurationpolicysetting.DefaultGetConfigurationPolicySettingOperationOptions())
+				if err != nil {
+					if response.WasNotFound(settingsResp.HttpResponse) {
+						return metadata.MarkAsGone(id)
+					}
+					return fmt.Errorf("retrieving %s: %+v", id, err)
 				}
-				return fmt.Errorf("retrieving %s: %+v", id, err)
-			}
 
-			return metadata.Encode(&model)
+				settingsModel = append(settingsModel, settingsResp.Model)
+
+			}
+			model.Settings[0] = flattenDeviceManagementConfigurationPolicySettings(settingsModel)
+
+			metadata.Encode(&model)
+
+			return metadata.ResourceData.Set("settings", flattenSettings(model.Settings))
 		},
 	}
 }
@@ -329,6 +280,8 @@ func (r DeviceManagementConfigurationPolicy) Update() sdk.ResourceFunc {
 		Timeout: 5 * time.Minute,
 		Func: func(ctx context.Context, metadata sdk.ResourceMetaData) error {
 			client := metadata.Client.DeviceManagement.ConfigurationPolicyClient
+			// settingsClient := metadata.Client.DeviceManagement.ConfigurationPolicySettingClient
+			// rd := metadata.ResourceData
 
 			id, err := beta.ParseDeviceManagementConfigurationPolicyID(metadata.ResourceData.Id())
 			if err != nil {
@@ -339,11 +292,20 @@ func (r DeviceManagementConfigurationPolicy) Update() sdk.ResourceFunc {
 			if err := metadata.Decode(&model); err != nil {
 				return fmt.Errorf("decoding: %+v", err)
 			}
+			settings := make([]DeviceManagementConfigurationPolicySettings, 0)
+			for _, setting := range expandSettings(metadata.ResourceData.Get("settings").([]interface{})) {
+				settings = append(settings, *setting)
+			}
+
+			model.Settings = settings
 
 			properties := beta.DeviceManagementConfigurationPolicy{
 				Description:     nullable.Value(model.Description),
 				Name:            nullable.Value(model.Name),
+				Platforms:       pointer.To(beta.DeviceManagementConfigurationPlatforms(model.Platforms)),
+				Technologies:    pointer.To(beta.DeviceManagementConfigurationTechnologies(model.Technologies)),
 				RoleScopeTagIds: pointer.To(model.RoleScopeTagIds),
+				Settings:        expandDeviceManagementConfigurationPolicySettings(model.Settings),
 			}
 
 			_, err = client.UpdateConfigurationPolicy(ctx, *id, properties, configurationpolicy.DefaultUpdateConfigurationPolicyOperationOptions())
@@ -377,18 +339,23 @@ func (r DeviceManagementConfigurationPolicy) Delete() sdk.ResourceFunc {
 	}
 }
 
-func flattenDeviceManagementConfigurationPolicySettings(input *[]beta.DeviceManagementConfigurationSetting) []DeviceManagementConfigurationPolicySettings {
-	result := make([]DeviceManagementConfigurationPolicySettings, 0)
+func flattenDeviceManagementConfigurationPolicySettings(input []*beta.DeviceManagementConfigurationSetting) DeviceManagementConfigurationPolicySettings {
 	if input == nil {
-		return result
+		return DeviceManagementConfigurationPolicySettings{}
 	}
 
-	for _, setting := range *input {
-		settingResult := DeviceManagementConfigurationPolicySettings{}
-		// id = setting.Id
+	result := DeviceManagementConfigurationPolicySettings{}
+
+	for _, setting := range input {
+		if setting == nil {
+			continue
+		}
 		switch v := setting.SettingInstance.(type) {
 		case beta.DeviceManagementConfigurationChoiceSettingInstance:
 			choiceSetting := DeviceManagementConfigurationChoiceSetting{}
+			if setting.Id != nil {
+				choiceSetting.Id = *setting.Id
+			}
 			if v.SettingDefinitionId != nil {
 				choiceSetting.SettingDefinitionId = *v.SettingDefinitionId
 			}
@@ -401,25 +368,24 @@ func flattenDeviceManagementConfigurationPolicySettings(input *[]beta.DeviceMana
 					choiceSetting.Children = flattenDeviceManagementConfigurationSettingInstance(v.ChoiceSettingValue.Children)
 				}
 			}
-			settingResult.ChoiceSettings = append(settingResult.ChoiceSettings, choiceSetting)
+			result.ChoiceSettings = append(result.ChoiceSettings, choiceSetting)
 		}
-
-		result = append(result, settingResult)
 	}
+
 	return result
 }
 
-func flattenDeviceManagementConfigurationSettingInstance(input *[]beta.DeviceManagementConfigurationSettingInstance) []*DeviceManagementConfigurationPolicySettings {
-	result := make([]*DeviceManagementConfigurationPolicySettings, 0)
+func flattenDeviceManagementConfigurationSettingInstance(input *[]beta.DeviceManagementConfigurationSettingInstance) []*DeviceManagementConfigurationPolicySettingsInstance {
+	result := make([]*DeviceManagementConfigurationPolicySettingsInstance, 0)
 	if input == nil {
 		return result
 	}
 
 	for _, setting := range *input {
-		settingResult := DeviceManagementConfigurationPolicySettings{}
+		settingResult := DeviceManagementConfigurationPolicySettingsInstance{}
 		switch v := setting.(type) {
 		case beta.DeviceManagementConfigurationChoiceSettingInstance:
-			choiceSetting := DeviceManagementConfigurationChoiceSetting{}
+			choiceSetting := DeviceManagementConfigurationChoiceSettingInstance{}
 			if v.SettingDefinitionId != nil {
 				choiceSetting.SettingDefinitionId = *v.SettingDefinitionId
 			}
@@ -444,30 +410,8 @@ func expandDeviceManagementConfigurationPolicySettings(input []DeviceManagementC
 
 	for _, setting := range input {
 		for _, choiceSetting := range setting.ChoiceSettings {
-			choiceSettingresult := beta.DeviceManagementConfigurationChoiceSettingInstance{
-				ChoiceSettingValue: pointer.To(beta.DeviceManagementConfigurationChoiceSettingValue{
-					Value: nullable.Value(choiceSetting.Value),
-				}),
-			}
-			if choiceSetting.SettingDefinitionId != "" {
-				choiceSettingresult.SettingDefinitionId = pointer.To(choiceSetting.SettingDefinitionId)
-			}
-			if choiceSetting.SettingValueTemplateId != "" {
-				choiceSettingresult.ChoiceSettingValue.SettingValueTemplateReference = pointer.To(beta.DeviceManagementConfigurationSettingValueTemplateReference{
-					SettingValueTemplateId: pointer.To(choiceSetting.SettingValueTemplateId),
-				})
-			}
-			children := make([]DeviceManagementConfigurationPolicySettings, 0)
-			for _, child := range choiceSetting.Children {
-				if child != nil {
-					children = append(children, pointer.From(child))
-				}
-			}
-			if len(children) > 0 {
-				choiceSettingresult.ChoiceSettingValue.Children = expandDeviceManagementConfigurationSettingInstance(children)
-			}
 			result = append(result, beta.DeviceManagementConfigurationSetting{
-				SettingInstance: choiceSettingresult,
+				SettingInstance: expandDeviceManagementConfigurationChoiceSetting(choiceSetting),
 			})
 		}
 	}
@@ -475,35 +419,203 @@ func expandDeviceManagementConfigurationPolicySettings(input []DeviceManagementC
 	return &result
 }
 
-func expandDeviceManagementConfigurationSettingInstance(input []DeviceManagementConfigurationPolicySettings) *[]beta.DeviceManagementConfigurationSettingInstance {
+func expandDeviceManagementConfigurationSettingInstance(input []DeviceManagementConfigurationPolicySettingsInstance) *[]beta.DeviceManagementConfigurationSettingInstance {
 	result := make([]beta.DeviceManagementConfigurationSettingInstance, 0)
 
 	for _, setting := range input {
 		for _, choiceSetting := range setting.ChoiceSettings {
-			choiceSettingresult := beta.DeviceManagementConfigurationChoiceSettingInstance{
-				ChoiceSettingValue: pointer.To(beta.DeviceManagementConfigurationChoiceSettingValue{
-					Value: nullable.Value(choiceSetting.Value),
-				}),
-			}
-			if choiceSetting.SettingDefinitionId != "" {
-				choiceSettingresult.SettingDefinitionId = pointer.To(choiceSetting.SettingDefinitionId)
-			}
-			if choiceSetting.SettingValueTemplateId != "" {
-				choiceSettingresult.ChoiceSettingValue.SettingValueTemplateReference = pointer.To(beta.DeviceManagementConfigurationSettingValueTemplateReference{
-					SettingValueTemplateId: pointer.To(choiceSetting.SettingValueTemplateId),
-				})
-			}
-			children := make([]DeviceManagementConfigurationPolicySettings, 0)
-			for _, child := range choiceSetting.Children {
-				if child != nil {
-					children = append(children, pointer.From(child))
-				}
-			}
-			if len(children) > 0 {
-				choiceSettingresult.ChoiceSettingValue.Children = expandDeviceManagementConfigurationSettingInstance(children)
-			}
-			result = append(result, choiceSettingresult)
+			result = append(result, expandDeviceManagementConfigurationChoiceSettingInstance(choiceSetting))
 		}
 	}
 	return &result
+}
+
+func expandDeviceManagementConfigurationChoiceSetting(input DeviceManagementConfigurationChoiceSetting) *beta.DeviceManagementConfigurationChoiceSettingInstance {
+	result := beta.DeviceManagementConfigurationChoiceSettingInstance{
+		ChoiceSettingValue: pointer.To(beta.DeviceManagementConfigurationChoiceSettingValue{
+			Value: nullable.Value(input.Value),
+		}),
+	}
+	if input.SettingDefinitionId != "" {
+		result.SettingDefinitionId = pointer.To(input.SettingDefinitionId)
+	}
+	if input.SettingValueTemplateId != "" {
+		result.ChoiceSettingValue.SettingValueTemplateReference = pointer.To(beta.DeviceManagementConfigurationSettingValueTemplateReference{
+			SettingValueTemplateId: pointer.To(input.SettingValueTemplateId),
+		})
+	}
+	children := make([]DeviceManagementConfigurationPolicySettingsInstance, 0)
+	for _, child := range input.Children {
+		if child != nil {
+			children = append(children, pointer.From(child))
+		}
+	}
+	if len(children) > 0 {
+		result.ChoiceSettingValue.Children = expandDeviceManagementConfigurationSettingInstance(children)
+	}
+
+	return &result
+}
+
+func expandDeviceManagementConfigurationChoiceSettingInstance(input DeviceManagementConfigurationChoiceSettingInstance) *beta.DeviceManagementConfigurationChoiceSettingInstance {
+	result := beta.DeviceManagementConfigurationChoiceSettingInstance{
+		ChoiceSettingValue: pointer.To(beta.DeviceManagementConfigurationChoiceSettingValue{
+			Value: nullable.Value(input.Value),
+		}),
+	}
+	if input.SettingDefinitionId != "" {
+		result.SettingDefinitionId = pointer.To(input.SettingDefinitionId)
+	}
+	if input.SettingValueTemplateId != "" {
+		result.ChoiceSettingValue.SettingValueTemplateReference = pointer.To(beta.DeviceManagementConfigurationSettingValueTemplateReference{
+			SettingValueTemplateId: pointer.To(input.SettingValueTemplateId),
+		})
+	}
+	children := make([]DeviceManagementConfigurationPolicySettingsInstance, 0)
+	for _, child := range input.Children {
+		if child != nil {
+			children = append(children, pointer.From(child))
+		}
+	}
+	if len(children) > 0 {
+		result.ChoiceSettingValue.Children = expandDeviceManagementConfigurationSettingInstance(children)
+	}
+
+	return &result
+}
+
+// Supporting function as the endcode/decode functions do not work with pointers
+func expandSettings(in []interface{}) []*DeviceManagementConfigurationPolicySettings {
+	if len(in) == 0 || in[0] == nil {
+		return nil
+	}
+
+	result := make([]*DeviceManagementConfigurationPolicySettings, 0)
+
+	for _, setting := range in {
+		settingResult := DeviceManagementConfigurationPolicySettings{}
+		config := setting.(map[string]interface{})
+
+		settingResult.ChoiceSettings = expandChoiceSettings(config["choice_setting"].([]interface{}))
+
+		result = append(result, pointer.To(settingResult))
+	}
+
+	return result
+}
+
+func expandSettingsInstance(in []interface{}) []*DeviceManagementConfigurationPolicySettingsInstance {
+	if len(in) == 0 || in[0] == nil {
+		return nil
+	}
+
+	result := make([]*DeviceManagementConfigurationPolicySettingsInstance, 0)
+
+	for _, setting := range in {
+		settingResult := DeviceManagementConfigurationPolicySettingsInstance{}
+		config := setting.(map[string]interface{})
+
+		settingResult.ChoiceSettings = expandChoiceSettingsInstance(config["choice_setting"].([]interface{}))
+
+		result = append(result, pointer.To(settingResult))
+	}
+
+	return result
+}
+
+func expandChoiceSettings(in []interface{}) []DeviceManagementConfigurationChoiceSetting {
+	result := make([]DeviceManagementConfigurationChoiceSetting, 0)
+	for _, setting := range in {
+		config := setting.(map[string]interface{})
+		settingResult := DeviceManagementConfigurationChoiceSetting{
+			SettingDefinitionId:       config["setting_definition_id"].(string),
+			SettingInstanceTemplateId: config["setting_instance_template_id"].(string),
+			Value:                     config["value"].(string),
+			SettingValueTemplateId:    config["setting_value_template_id"].(string),
+			Children:                  expandSettingsInstance(config["children"].([]interface{})),
+		}
+		result = append(result, settingResult)
+	}
+	return result
+}
+
+func expandChoiceSettingsInstance(in []interface{}) []DeviceManagementConfigurationChoiceSettingInstance {
+	result := make([]DeviceManagementConfigurationChoiceSettingInstance, 0)
+	for _, setting := range in {
+		config := setting.(map[string]interface{})
+		settingResult := DeviceManagementConfigurationChoiceSettingInstance{
+			SettingDefinitionId:       config["setting_definition_id"].(string),
+			SettingInstanceTemplateId: config["setting_instance_template_id"].(string),
+			Value:                     config["value"].(string),
+			SettingValueTemplateId:    config["setting_value_template_id"].(string),
+			Children:                  expandSettingsInstance(config["children"].([]interface{})),
+		}
+		result = append(result, settingResult)
+	}
+	return result
+}
+
+func flattenSettings(in []DeviceManagementConfigurationPolicySettings) []interface{} {
+	if len(in) == 0 {
+		return []interface{}{}
+	}
+
+	return []interface{}{
+		map[string]interface{}{
+			"choice_setting": flattenChoiceSettings(in[0].ChoiceSettings),
+		},
+	}
+}
+
+func flattenChoiceSettings(in []DeviceManagementConfigurationChoiceSetting) []interface{} {
+	if len(in) == 0 {
+		return []interface{}{}
+	}
+
+	result := []interface{}{}
+
+	for _, setting := range in {
+		result = append(result, map[string]interface{}{
+			"id":                           setting.Id,
+			"setting_definition_id":        setting.SettingDefinitionId,
+			"setting_instance_template_id": setting.SettingInstanceTemplateId,
+			"value":                        setting.Value,
+			"setting_value_template_id":    setting.SettingValueTemplateId,
+			"children":                     flattenSettingsInstance(setting.Children),
+		})
+	}
+
+	return result
+}
+
+func flattenSettingsInstance(in []*DeviceManagementConfigurationPolicySettingsInstance) []interface{} {
+	if len(in) == 0 || in[0] == nil {
+		return []interface{}{}
+	}
+
+	return []interface{}{
+		map[string]interface{}{
+			"choice_setting": flattenChoiceSettingsInstance(in[0].ChoiceSettings),
+		},
+	}
+}
+
+func flattenChoiceSettingsInstance(in []DeviceManagementConfigurationChoiceSettingInstance) []interface{} {
+	if len(in) == 0 {
+		return []interface{}{}
+	}
+
+	result := []interface{}{}
+
+	for _, setting := range in {
+		result = append(result, map[string]interface{}{
+			"setting_definition_id":        setting.SettingDefinitionId,
+			"setting_instance_template_id": setting.SettingInstanceTemplateId,
+			"value":                        setting.Value,
+			"setting_value_template_id":    setting.SettingValueTemplateId,
+			"children":                     flattenSettingsInstance(setting.Children),
+		})
+	}
+
+	return result
 }

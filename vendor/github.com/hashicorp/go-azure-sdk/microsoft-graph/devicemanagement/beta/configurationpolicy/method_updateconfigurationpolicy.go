@@ -55,7 +55,7 @@ func (c ConfigurationPolicyClient) UpdateConfigurationPolicy(ctx context.Context
 			http.StatusNoContent,
 			http.StatusOK,
 		},
-		HttpMethod:    http.MethodPatch,
+		HttpMethod:    http.MethodPut,
 		OptionsObject: options,
 		Path:          id.ID(),
 		RetryFunc:     options.RetryFunc,
